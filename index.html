@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="kk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ТОБЖ: толық ішкі шағылудың 3D-моделі</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+:root{
+  --bg:#0b0f13; --panel:#141b21; --panel2:#0f151a; --line:#26313a;
+  --ink:#e8eeec; --ink2:#93a3ae;
+  --core:#6fb4d8; --beam:#38e0ac; --warn:#ff8a5c;
+  --halo:rgba(56,224,172,.12);
+}
+:root[data-theme="light"]{
+  --bg:#f1f3ef; --panel:#fff; --panel2:#f7f8f5; --line:#d5d9d2;
+  --ink:#10151c; --ink2:#48586a;
+  --core:#2f6f8f; --beam:#0f9e77; --warn:#c0562f; --halo:rgba(15,158,119,.12);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:"IBM Plex Sans",-apple-system,Segoe UI,Roboto,sans-serif;font-size:16px;line-height:1.55;
+  transition:background .3s,color .3s}
+.wrap{max-width:1140px;margin:0 auto;padding:0 20px 70px}
+.eyebrow{font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink2);margin:34px 0 10px}
+h1{font-family:"Source Serif 4",Georgia,serif;font-weight:600;font-size:clamp(28px,4.4vw,44px);
+  line-height:1.1;margin:0 0 12px;letter-spacing:-.01em}
+.lead{color:var(--ink2);max-width:68ch;margin:0 0 6px}
+h2{font-family:"Source Serif 4",Georgia,serif;font-weight:600;font-size:25px;margin:40px 0 8px}
+h3{font-size:16px;font-weight:600;margin:22px 0 8px}
+p{max-width:74ch}
+.topbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.grid{display:grid;gap:18px;margin-top:18px}
+@media(min-width:900px){.grid.main{grid-template-columns:1.5fr 1fr;align-items:start}
+.grid.half{grid-template-columns:1fr 1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;
+  transition:background .3s,border-color .3s}
+.card.flush{padding:0;overflow:hidden}
+#stage{position:relative;height:clamp(320px,46vh,520px);background:radial-gradient(120% 90% at 50% 0%,var(--halo),transparent 70%);
+  touch-action:none;cursor:grab}
+#stage:active{cursor:grabbing}
+#stage canvas{display:block;width:100%;height:100%}
+.badge{position:absolute;top:12px;left:12px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--ink2);background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:5px 11px}
+.state{position:absolute;top:12px;right:12px;display:flex;align-items:center;gap:7px;font-size:12.5px;
+  background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:5px 12px;
+  transition:color .35s,border-color .35s}
+.state .dot{width:7px;height:7px;border-radius:50%;background:currentColor;animation:blink 1.6s ease-in-out infinite}
+@keyframes blink{50%{opacity:.35}}
+.state.ok{color:var(--beam)} .state.no{color:var(--warn);border-color:var(--warn)}
+.scalebar{position:absolute;bottom:12px;left:12px;right:12px;display:flex;justify-content:space-between;gap:10px;
+  font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--ink2);pointer-events:none}
+.stagefoot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:10px 14px;border-top:1px solid var(--line);font-size:12.5px;color:var(--ink2)}
+.ctl{margin-bottom:15px}
+.ctl label{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:14px;margin-bottom:5px}
+.ctl .val{font-family:"IBM Plex Mono",monospace;color:var(--core);white-space:nowrap}
+input[type=range]{width:100%;accent-color:var(--core)}
+select,input[type=number]{font:inherit;font-size:14px;padding:7px 9px;border:1px solid var(--line);
+  border-radius:8px;background:var(--panel2);color:var(--ink);width:100%}
+button{font:inherit;font-size:14px;padding:8px 14px;border-radius:8px;cursor:pointer;
+  border:1px solid var(--line);background:var(--panel2);color:var(--ink);transition:border-color .2s,transform .1s}
+button:active{transform:scale(.97)}
+button.pri{background:var(--core);border-color:var(--core);color:var(--bg);font-weight:500}
+button:hover{border-color:var(--core)}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--core);outline-offset:2px}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+.row.small button{font-size:13px;padding:6px 10px}
+dl.ro{display:grid;grid-template-columns:1fr auto;gap:7px 14px;margin:0;font-size:14px}
+dl.ro dt{color:var(--ink2)} dl.ro dd{margin:0;font-family:"IBM Plex Mono",monospace;text-align:right;transition:color .3s}
+.sep{border-top:1px solid var(--line);margin:14px 0 12px}
+.formula{display:flex;justify-content:space-between;gap:14px;align-items:baseline;
+  padding:9px 0;border-bottom:1px solid var(--line);font-size:14px}
+.formula:last-child{border-bottom:0}
+.formula .f{font-family:"IBM Plex Mono",monospace;color:var(--ink2)}
+.formula .r{font-family:"IBM Plex Mono",monospace;color:var(--beam);white-space:nowrap;transition:color .3s}
+.formula .r.bad{color:var(--warn)}
+canvas.flat{display:block;width:100%;border-radius:8px}
+.hint{font-size:13px;color:var(--ink2);max-width:74ch}
+.eq{font-family:"IBM Plex Mono",monospace;background:var(--panel2);border-left:2px solid var(--core);
+  padding:9px 13px;margin:12px 0;font-size:14px;overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px;margin-top:8px}
+th,td{border-bottom:1px solid var(--line);padding:9px 10px;text-align:left;vertical-align:top}
+th{color:var(--ink2);font-weight:600}
+.scroll{overflow-x:auto}
+.fb{font-size:14px;margin-top:9px}
+.fb.ok{color:var(--beam)} .fb.no{color:var(--warn)}
+.ans{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.ans input{max-width:170px}
+.chg{animation:chg .6s ease-out}
+@keyframes chg{0%{color:var(--ink)}}
+footer{margin-top:48px;padding-top:18px;border-top:1px solid var(--line);color:var(--ink2);font-size:13px}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="topbar">
+  <p class="eyebrow">STEM · физика · РЭТ</p>
+  <button id="theme">Ашық тақырып</button>
+</div>
+<h1>Талшықты-оптикалық байланыс желісіндегі толық ішкі шағылу</h1>
+<p class="lead">«Оптикалық талшықтағы толық ішкі шағылуды зерттеу» тапсырмасына арналған интерактивті модель. Сыну көрсеткіштерін, түсу бұрышын, өзек радиусын, талшық ұзындығын және толқын ұзындығын өзгертіңіз — модель әр өзгерісті біркелкі анимациямен көрсетіп, сигналдың өту шартын, шағылу санын, кідірісті, шығындарды және өткізу жолағын қайта есептейді.</p>
+
+<div class="grid main">
+  <div>
+    <div class="card flush">
+      <div id="stage">
+        <span class="badge">3D талшық моделі</span>
+        <span class="state ok" id="state"><span class="dot"></span><span id="stateText">ТІШ: сигнал өтеді</span></span>
+        <div class="scalebar"><span id="scaleLeft"></span><span id="scaleRight"></span></div>
+      </div>
+      <div class="stagefoot">
+        <span>сүйреу — айналдыру · дөңгелек — масштаб</span>
+        <span class="row">
+          <button id="spin">⟳ автоайналу: қосулы</button>
+          <button id="view">Көрініс: бүйірден</button>
+        </span>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:18px">
+      <h3 style="margin-top:0">Шекарадағы сәуле: шағылу және сыну</h3>
+      <canvas id="cBnd" class="flat" height="250"></canvas>
+      <p class="hint">Түсу бұрышы шекті бұрыштан үлкен болса — сәуле толығымен шағылады. Кіші болса — оның бір бөлігі қабыққа сынып өтеді. R — Френель формуласы бойынша шағылу коэффициенті.</p>
+    </div>
+
+    <div class="grid half">
+      <div class="card">
+        <h3 style="margin-top:0">Енгізу апертурасы</h3>
+        <canvas id="cNA" class="flat" height="210"></canvas>
+        <p class="hint">Жасыл конус — жарық өзекке әлі ұсталатын бұрыштар. Сызық — ағымдағы θ бұрышына сәйкес ауадан келетін сәуле.</p>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0">Желі бойындағы қуат</h3>
+        <canvas id="cPow" class="flat" height="210"></canvas>
+        <p class="hint">Пунктир — таратқыш қуаты 0 дБм болғанда қабылдағыштың сезгіштік шегі −28 дБм.</p>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="card">
+      <h3 style="margin-top:0">Талшық параметрлері</h3>
+      <div class="ctl"><label>Өзектің сыну көрсеткіші, n₁ <span class="val" id="vN1">1.480</span></label>
+        <input type="range" id="n1" min="1.400" max="1.600" step="0.001" value="1.480"></div>
+      <div class="ctl"><label>Қабықтың сыну көрсеткіші, n₂ <span class="val" id="vN2">1.440</span></label>
+        <input type="range" id="n2" min="1.300" max="1.599" step="0.001" value="1.440"></div>
+      <div class="ctl"><label>Шекараға түсу бұрышы, θ <span class="val" id="vTh">82.0°</span></label>
+        <input type="range" id="th" min="50" max="89.5" step="0.1" value="82"></div>
+      <div class="ctl"><label>Өзек радиусы, a <span class="val" id="vA">25 мкм</span></label>
+        <input type="range" id="ra" min="4" max="100" step="0.5" value="25"></div>
+      <div class="ctl"><label>Талшық ұзындығы, L <span class="val" id="vL">1.00 м</span></label>
+        <input type="range" id="len" min="-3" max="4" step="0.01" value="0">
+        <div class="row small">
+          <button data-len="-3">1 мм</button>
+          <button data-len="-1">10 см</button>
+          <button data-len="0">1 м</button>
+          <button data-len="2">100 м</button>
+          <button data-len="3">1 км</button>
+          <button data-len="4">10 км</button>
+        </div>
+      </div>
+      <div class="ctl"><label>Жұмыс толқын ұзындығы, λ</label>
+        <select id="lam">
+          <option value="850">850 нм — α ≈ 2.4 дБ/км, D ≈ 90 пс/(нм·км)</option>
+          <option value="1310">1310 нм — α ≈ 0.34 дБ/км, D ≈ 3 пс/(нм·км)</option>
+          <option value="1550" selected>1550 нм — α ≈ 0.20 дБ/км, D ≈ 17 пс/(нм·км)</option>
+        </select></div>
+      <div class="row">
+        <button class="pri" id="demoOk">Мақаладағы мысал</button>
+        <button id="demoBad">Сигнал жоғалуын көрсету</button>
+        <button id="reset">Бастапқы күй</button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:18px">
+      <h3 style="margin-top:0">Формулалар, тікелей есептеу</h3>
+      <div class="formula"><span><span class="f">n₁ &gt; n₂</span><br><span class="hint">толқынжол шарты</span></span><span class="r" id="r1"></span></div>
+      <div class="formula"><span><span class="f">sin θкр = n₂/n₁</span><br><span class="hint">шекті бұрыш</span></span><span class="r" id="r2"></span></div>
+      <div class="formula"><span><span class="f">NA = √(n₁² − n₂²)</span><br><span class="hint">сандық апертура</span></span><span class="r" id="r3"></span></div>
+      <div class="formula"><span><span class="f">θmax = arcsin NA</span><br><span class="hint">ауадан енгізудің ең үлкен бұрышы</span></span><span class="r" id="r4"></span></div>
+      <div class="formula"><span><span class="f">V = 2πa·NA/λ</span><br><span class="hint">мода саны</span></span><span class="r" id="r5"></span></div>
+    </div>
+
+    <div class="card" style="margin-top:18px">
+      <h3 style="margin-top:0">Таңдалған ұзындық нені береді</h3>
+      <dl class="ro">
+        <dt>Шағылулар арасындағы қадам</dt><dd id="oStep"></dd>
+        <dt>Толық ұзындықтағы шағылу саны</dt><dd id="oRefl"></dd>
+        <dt>Сәуле жолы</dt><dd id="oPath"></dd>
+        <dt>Зигзагтан жолдың ұзаруы</dt><dd id="oExtra"></dd>
+        <dt>Өту уақыты</dt><dd id="oTime"></dd>
+        <dt>Талшықтағы шығын</dt><dd id="oLoss"></dd>
+        <dt>Шығыстағы қуат (кірісте 0 дБм)</dt><dd id="oPout"></dd>
+        <dt>Модааралық кеңею</dt><dd id="oModal"></dd>
+        <dt>Өткізу жолағы</dt><dd id="oBW"></dd>
+        <dt>Шекті беру жылдамдығы</dt><dd id="oRate"></dd>
+      </dl>
+      <div class="sep"></div>
+      <p class="hint" id="engNote"></p>
+    </div>
+  </div>
+</div>
+
+<h2>Тапсырмадағы мысалды талдау</h2>
+<p>Өзектің сыну көрсеткіші n₁ = 1.48, өзек–қабық шекарасына сәуленің түсу бұрышы θ = 82°. Толық ішкі шағылу сақталатын n₂-нің ең үлкен мәнін табу керек.</p>
+<div class="eq">sin θ ≥ n₂/n₁ &nbsp;⟹&nbsp; n₂ ≤ n₁·sin θ = 1.48 · sin 82° = 1.48 · 0.99027 = 1.4656</div>
+<p>n₂ = 1.440 болғанда сигнал талшық бойымен өтеді. n₂ = 1.470 болғанда шарт бұзылып, сәуле қабық арқылы шығып кетеді — «Сигнал жоғалуын көрсету» батырмасын басып, 3D-модельге қараңыз.</p>
+
+<div class="grid half">
+  <div class="card">
+    <h3 style="margin-top:0">Өзіңізді тексеріңіз: шекті бұрыш</h3>
+    <p class="hint">n₁ = 1.48 және n₂ = 1.46 болғанда θкр-ды градуспен табыңыз.</p>
+    <div class="ans"><input type="number" step="0.01" id="q1" placeholder="θкр, °"><button class="pri" data-q="1">Тексеру</button></div>
+    <div class="fb" id="f1"></div>
+  </div>
+  <div class="card">
+    <h3 style="margin-top:0">Өзіңізді тексеріңіз: апертура</h3>
+    <p class="hint">Сол материалдар жұбы үшін NA-ны төрт таңбаға дейінгі дәлдікпен есептеңіз.</p>
+    <div class="ans"><input type="number" step="0.0001" id="q2" placeholder="NA"><button class="pri" data-q="2">Тексеру</button></div>
+    <div class="fb" id="f2"></div>
+  </div>
+</div>
+
+<h2>Параметрлер қалай байланысқан</h2>
+<div class="scroll"><table>
+  <tr><th>Арттырылатын шама</th><th>Шекті бұрыш</th><th>NA апертурасы</th><th>Мода саны</th><th>Өткізу жолағы</th></tr>
+  <tr><td>n₁ (n₂ тұрақты)</td><td>кемиді</td><td>өседі</td><td>өседі</td><td>тарылады</td></tr>
+  <tr><td>n₂ (n₁ тұрақты)</td><td>өседі</td><td>кемиді</td><td>кемиді</td><td>кеңейеді</td></tr>
+  <tr><td>өзек радиусы a</td><td>өзгермейді</td><td>өзгермейді</td><td>өседі</td><td>тарылады</td></tr>
+  <tr><td>талшық ұзындығы L</td><td>өзгермейді</td><td>өзгермейді</td><td>өзгермейді</td><td>L-ге кері пропорционал тарылады</td></tr>
+</table></div>
+<p class="hint">Осыдан тапсырманың басты инженерлік қорытындысы: кең апертура жарықты енгізуге ыңғайлы, бірақ ол n₁ − n₂ айырмасының үлкен екенін, моданың көптігін және жолақтың тарлығын білдіреді. Бірмодалы талшық алыс қашықтық пен жылдамдық үшін енгізудің ыңғайлылығын құрбан етеді.</p>
+
+<footer>
+  Модель сатылы профиль мен меридиандық сәулелер үшін сәулелік жуықтауда құрылған; өшу мен дисперсия стандартты талшықтың типтік мәндері бойынша алынған. 3D-көріністе радиалды масштаб көрнекілік үшін ×5 үлкейтілген, ал сәуленің түсі — толқын ұзындығының шартты белгісі (инфрақызыл сәуле көзге көрінбейді). «РЭТ» мамандығы студенттерінің физика бойынша STEM-бағытталған тапсырмалар негізінде талшықты-оптикалық байланыс жүйелерін зерттеуі» мақаласының материалдары бойынша (Сыздыкова Р.Н. және т.б., Ғ. Дәукеев атындағы АЭжБУ). Сандық апертура жалпы қабылданған NA = √(n₁² − n₂²) түрінде жазылған.
+</footer>
+</div>
+
+<script>
+(function(){
+"use strict";
+var C=299792458;
+var LAMS={850:{alpha:2.40,col:'#ff5f7e'},1310:{alpha:0.34,col:'#ffc857'},1550:{alpha:0.20,col:'#38e0ac'}};
+var LEAK_COL='#ff7a45';
+var REDUCE=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+var EXAG=5;                       // radial exaggeration in 3D view
+
+function el(id){return document.getElementById(id);}
+function css(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim();}
+function deg(r){return r*180/Math.PI;} function rad(d){return d*Math.PI/180;}
+function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+function fx(n,d){return (Math.round(n*Math.pow(10,d))/Math.pow(10,d)).toFixed(d);}
+function loc(n){try{return n.toLocaleString('kk-KZ');}catch(e){return String(n);}}
+function hexRGB(h){h=h.replace('#','');return [parseInt(h.substr(0,2),16)/255,parseInt(h.substr(2,2),16)/255,parseInt(h.substr(4,2),16)/255];}
+function lenStr(m){
+  if(m<0.01) return fx(m*1000,2)+' мм';
+  if(m<1) return fx(m*100,2)+' см';
+  if(m<1000) return fx(m,2)+' м';
+  return fx(m/1000,2)+' км';
+}
+function smallLen(m){
+  if(m<1e-3) return fx(m*1e6,1)+' мкм';
+  if(m<1) return fx(m*1000,2)+' мм';
+  if(m<1000) return fx(m,3)+' м';
+  return fx(m/1000,3)+' км';
+}
+
+/* ---------- target (from controls) and displayed (animated) state ---------- */
+var KEYS=['n1','n2','th','la','ll','lam','alpha','cr','cg','cb'];
+var EPS={n1:2e-6,n2:2e-6,th:2e-4,la:2e-5,ll:2e-5,lam:.02,alpha:2e-5,cr:1e-3,cg:1e-3,cb:1e-3};
+function readTarget(){
+  var n1=+el('n1').value,n2=+el('n2').value;
+  if(n2>=n1){n2=Math.max(1.3,n1-0.002);el('n2').value=n2.toFixed(3);}
+  var lam=+el('lam').value,c=hexRGB(LAMS[lam].col);
+  return {n1:n1,n2:n2,th:+el('th').value,la:Math.log10(+el('ra').value),ll:+el('len').value,
+    lam:lam,alpha:LAMS[lam].alpha,cr:c[0],cg:c[1],cb:c[2]};
+}
+var T=readTarget(),D={};KEYS.forEach(function(k){D[k]=T[k];});
+
+/* ---------- physics ---------- */
+function fresnel(n1,n2,th){
+  var ci=Math.cos(rad(th)),st=n1/n2*Math.sin(rad(th));
+  if(st>=1)return 1;
+  var ct=Math.sqrt(1-st*st);
+  var rs=(n1*ci-n2*ct)/(n1*ci+n2*ct),rp=(n2*ci-n1*ct)/(n2*ci+n1*ct);
+  return (rs*rs+rp*rp)/2;
+}
+function compute(p){
+  var n1=p.n1,n2=p.n2,th=p.th,a=Math.pow(10,p.la)*1e-6,L=Math.pow(10,p.ll),lam=p.lam;
+  var guide=n1>n2;
+  var crit=guide?deg(Math.asin(n2/n1)):NaN;
+  var tir=guide&&th>crit;
+  var na=guide?Math.sqrt(n1*n1-n2*n2):0;
+  var thMax=na<1?deg(Math.asin(na)):90;
+  var delta=(n1-n2)/n1;
+  var step=2*a*Math.tan(rad(th));
+  var nRefl=tir?Math.floor(L/step):0;
+  var pathF=1/Math.sin(rad(th));
+  var path=tir?L*pathF:L;
+  var time=path*n1/C;
+  var loss=p.alpha*L/1000;
+  var modal=n1*delta/C*L;
+  var bw=modal>0?0.44/modal:Infinity;
+  var V=2*Math.PI*a*na/(lam*1e-9);
+  var modes=V<2.405?1:Math.round(V*V/2);
+  var R=fresnel(n1,n2,th);
+  var sT=n1/n2*Math.sin(rad(th));
+  var thT=sT<1?deg(Math.asin(sT)):90;
+  var sIn=n1*Math.cos(rad(th));
+  var thIn=sIn<1?deg(Math.asin(sIn)):NaN;
+  return {n1:n1,n2:n2,th:th,a:a,L:L,lam:lam,guide:guide,crit:crit,tir:tir,na:na,thMax:thMax,
+    delta:delta,step:step,nRefl:nRefl,pathF:pathF,path:path,time:time,alpha:p.alpha,loss:loss,
+    pout:-loss,modal:modal,bw:bw,V:V,modes:modes,R:R,thT:thT,thIn:thIn};
+}
+var S=compute(D);
+
+/* ---------- theme ---------- */
+el('theme').addEventListener('click',function(){
+  var light=document.documentElement.getAttribute('data-theme')==='light';
+  document.documentElement.setAttribute('data-theme',light?'dark':'light');
+  this.textContent=light?'Ашық тақырып':'Қараңғы тақырып';
+  dirty=true;
+});
+
+/* ---------- three.js scene ---------- */
+var stage=el('stage'),renderer,scene,camera,group,ok3d=false;
+var SCENE_L=520,CLAD_R=34;
+var coreMesh,coreEdge,cladMesh,rx,rxRing,tx,pool=[],POOL=320,photons=[],path3=[],segLen=[],totalLen=0;
+var beamCol,leakCol,warnCol;
+try{
+  renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  stage.appendChild(renderer.domElement);
+  scene=new THREE.Scene();
+  camera=new THREE.PerspectiveCamera(36,1,0.1,5000);
+  camera.position.set(0,110,370);camera.lookAt(0,0,0);
+  scene.add(new THREE.AmbientLight(0xffffff,.8));
+  var dl=new THREE.DirectionalLight(0xffffff,.55);dl.position.set(140,200,160);scene.add(dl);
+  group=new THREE.Group();scene.add(group);
+  beamCol=new THREE.Color(0x38e0ac);leakCol=new THREE.Color(LEAK_COL);warnCol=new THREE.Color(0xff8a5c);
+
+  var unit=new THREE.CylinderGeometry(1,1,SCENE_L,64,1,true);
+  cladMesh=new THREE.Mesh(unit,new THREE.MeshPhongMaterial({color:0x7fa8c4,transparent:true,opacity:.13,side:THREE.DoubleSide,depthWrite:false}));
+  cladMesh.rotation.z=Math.PI/2;cladMesh.scale.set(CLAD_R,1,CLAD_R);group.add(cladMesh);
+  var cladEdge=new THREE.LineSegments(new THREE.EdgesGeometry(unit),
+      new THREE.LineBasicMaterial({color:0x8fb6cc,transparent:true,opacity:.3}));
+  cladEdge.rotation.z=Math.PI/2;cladEdge.scale.set(CLAD_R,1,CLAD_R);group.add(cladEdge);
+  coreMesh=new THREE.Mesh(unit,new THREE.MeshPhongMaterial({color:0x4f93b8,transparent:true,opacity:.22,side:THREE.DoubleSide,depthWrite:false}));
+  coreMesh.rotation.z=Math.PI/2;group.add(coreMesh);
+  coreEdge=new THREE.LineSegments(new THREE.EdgesGeometry(unit),
+      new THREE.LineBasicMaterial({color:0x8fb6cc,transparent:true,opacity:.45}));
+  coreEdge.rotation.z=Math.PI/2;group.add(coreEdge);
+
+  // transmitter and receiver discs
+  tx=new THREE.Mesh(new THREE.CircleGeometry(1,40),new THREE.MeshBasicMaterial({color:0x38e0ac,transparent:true,opacity:.55,side:THREE.DoubleSide}));
+  tx.rotation.y=Math.PI/2;tx.position.x=-SCENE_L/2-0.5;group.add(tx);
+  rx=new THREE.Mesh(new THREE.CircleGeometry(CLAD_R,48),new THREE.MeshBasicMaterial({color:0x38e0ac,transparent:true,opacity:.4,side:THREE.DoubleSide}));
+  rx.rotation.y=Math.PI/2;rx.position.x=SCENE_L/2+0.5;group.add(rx);
+  rxRing=new THREE.Mesh(new THREE.RingGeometry(CLAD_R,CLAD_R+2.4,48),new THREE.MeshBasicMaterial({color:0x38e0ac,side:THREE.DoubleSide}));
+  rxRing.rotation.y=Math.PI/2;rxRing.position.x=SCENE_L/2+0.6;group.add(rxRing);
+
+  // ray segment pool
+  var segGeo=new THREE.CylinderGeometry(1,1,1,8);
+  for(var i=0;i<POOL;i++){
+    var m=new THREE.Mesh(segGeo,new THREE.MeshBasicMaterial({color:0x38e0ac,transparent:true,opacity:1}));
+    m.visible=false;group.add(m);pool.push(m);
+  }
+  for(var j=0;j<3;j++){
+    var ph=new THREE.Mesh(new THREE.SphereGeometry(4.2,16,16),new THREE.MeshBasicMaterial({color:0x38e0ac,transparent:true}));
+    group.add(ph);photons.push(ph);
+  }
+  ok3d=true;
+}catch(e){
+  stage.innerHTML='<p style="padding:20px;color:#93a3ae">Бұл браузерде 3D-көрініс қолжетімсіз, бірақ беттегі барлық есептеулер жұмыс істейді.</p>';
+}
+
+var segN=0,UPV=null;
+function seg(p1,p2,color,opacity,r){
+  if(segN>=POOL)return;
+  var dir=new THREE.Vector3().subVectors(p2,p1),len=dir.length();
+  if(len<1e-3)return;
+  var m=pool[segN++];
+  m.visible=true;
+  m.position.copy(p1).add(p2).multiplyScalar(.5);
+  m.scale.set(r||1.7,len,r||1.7);
+  m.quaternion.setFromUnitVectors(UPV||(UPV=new THREE.Vector3(0,1,0)),dir.normalize());
+  m.material.color.copy(color);m.material.opacity=opacity;
+}
+function coreRadius(){
+  var t=(D.la-Math.log10(4))/(Math.log10(100)-Math.log10(4));
+  return 8+18*clamp(t,0,1);
+}
+var view3={dz:0};
+function build3D(){
+  if(!ok3d)return;
+  segN=0;
+  var half=SCENE_L/2,cr=coreRadius();
+  coreMesh.scale.set(cr,1,cr);coreEdge.scale.set(cr,1,cr);
+  // core gets slightly denser look as n1-n2 grows
+  coreMesh.material.opacity=.16+clamp((S.n1-S.n2)/0.08,0,1)*.16;
+  beamCol.setRGB(D.cr,D.cg,D.cb);
+  tx.scale.set(cr,cr,1);tx.material.color.copy(beamCol);
+
+  var tanV=Math.tan(rad(S.th))/EXAG;                 // visual tangent from the normal
+  var dz=2*cr*tanV;view3.dz=dz;
+  var x=-half,y=0,up=true,I=1,first=true;
+  path3=[new THREE.Vector3(x,y,0)];
+  var leakEnd=null;
+  var guard=0;
+  while(guard++<400){
+    var targetY=up?cr:-cr;
+    var nx=x+(first?dz/2:dz);
+    if(nx>=half){
+      var f=(half-x)/(nx-x);
+      var pEnd=new THREE.Vector3(half,y+(targetY-y)*f,0);
+      seg(new THREE.Vector3(x,y,0),pEnd,beamCol,clamp(I,0,1),1.7);
+      if(!leakEnd)path3.push(pEnd);
+      break;
+    }
+    var p0=new THREE.Vector3(x,y,0),p1=new THREE.Vector3(nx,targetY,0);
+    seg(p0,p1,beamCol,clamp(I,.05,1),1.7*Math.max(.45,Math.sqrt(I)));
+    if(!leakEnd)path3.push(p1);
+    if(!S.tir){
+      var Il=I*(1-S.R);
+      if(Il>0.015){
+        var tV=Math.atan(Math.tan(rad(Math.min(S.thT,89.9)))/EXAG);
+        var Lout=150;
+        var out=new THREE.Vector3(nx+Lout*Math.sin(tV),targetY+(up?1:-1)*Lout*Math.cos(tV),0);
+        seg(p1,out,leakCol,clamp(Il*1.4,.12,1),1.4*Math.max(.5,Math.sqrt(Il)));
+        if(!leakEnd){leakEnd=out;path3.push(out);}
+      }
+      I*=S.R;
+      if(I<0.03)break;
+    }
+    x=nx;y=targetY;up=!up;first=false;
+  }
+  for(var i=segN;i<POOL;i++)pool[i].visible=false;
+  segLen=[];totalLen=0;
+  for(var j=0;j<path3.length-1;j++){var d=path3[j].distanceTo(path3[j+1]);segLen.push(d);totalLen+=d;}
+
+  // receiver brightness reflects output power vs −28 dBm threshold
+  var lvl=S.tir?clamp((S.pout+28)/28,0,1):0;
+  var reached=S.tir&&S.pout>=-28;
+  var rc=reached?beamCol:warnCol;
+  rx.material.color.copy(rc);rx.material.opacity=reached?.12+.55*lvl:(S.tir?.18:.06);
+  rxRing.material.color.copy(rc);
+  photons.forEach(function(ph){ph.material.color.copy(S.tir?beamCol:leakCol);});
+}
+function posAt(u){
+  if(path3.length<2)return new THREE.Vector3();
+  var d=u*totalLen,acc=0;
+  for(var i=0;i<segLen.length;i++){
+    if(acc+segLen[i]>=d)return new THREE.Vector3().lerpVectors(path3[i],path3[i+1],(d-acc)/segLen[i]);
+    acc+=segLen[i];
+  }
+  return path3[path3.length-1].clone();
+}
+
+/* camera controls with eased motion */
+var rotY=.55,rotX=.3,zoom=1,tRotY=.55,tRotX=.3,tZoom=1,drag=false,lx=0,ly=0,spin=true;
+if(ok3d){
+  stage.addEventListener('pointerdown',function(e){drag=true;lx=e.clientX;ly=e.clientY;
+    try{stage.setPointerCapture(e.pointerId);}catch(_){}});
+  stage.addEventListener('pointermove',function(e){if(!drag)return;
+    tRotY+=(e.clientX-lx)*.008;tRotX=clamp(tRotX+(e.clientY-ly)*.006,-1.25,1.25);
+    lx=e.clientX;ly=e.clientY;});
+  stage.addEventListener('pointerup',function(){drag=false;});
+  stage.addEventListener('pointercancel',function(){drag=false;});
+  stage.addEventListener('wheel',function(e){e.preventDefault();
+    tZoom=clamp(tZoom*(e.deltaY>0?1.08:.93),.5,2.4);},{passive:false});
+}
+el('spin').addEventListener('click',function(){spin=!spin;
+  this.textContent='⟳ автоайналу: '+(spin?'қосулы':'өшірулі');});
+var sideView=false;
+el('view').addEventListener('click',function(){
+  sideView=!sideView;spin=false;el('spin').textContent='⟳ автоайналу: өшірулі';
+  if(sideView){tRotX=0;tRotY=Math.round(tRotY/(2*Math.PI))*2*Math.PI;this.textContent='Көрініс: перспектива';}
+  else{tRotX=.35;tRotY+=.6;this.textContent='Көрініс: бүйірден';}
+});
+function resize3D(){if(!ok3d)return;
+  var w=stage.clientWidth||600,h=stage.clientHeight||420;
+  renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
+
+/* ---------- readouts ---------- */
+function setText(id,txt){var e=el(id);if(e.textContent!==txt)e.textContent=txt;}
+function labels(){
+  setText('vN1',T.n1.toFixed(3));
+  setText('vN2',T.n2.toFixed(3));
+  setText('vTh',T.th.toFixed(1)+'°');
+  setText('vA',(+el('ra').value).toFixed(1)+' мкм');
+  setText('vL',lenStr(Math.pow(10,T.ll)));
+}
+function readouts(){
+  setText('r1',S.n1.toFixed(3)+' > '+S.n2.toFixed(3)+(S.guide?' — иә':' — жоқ'));
+  el('r1').className='r'+(S.guide?'':' bad');
+  setText('r2',S.guide?fx(S.crit,2)+'°':'—');
+  setText('r3',fx(S.na,4));
+  setText('r4',fx(S.thMax,2)+'°');
+  setText('r5',S.V<2.405?'V = '+fx(S.V,2)+' · 1 мода':'V = '+fx(S.V,1)+' · ≈'+loc(S.modes)+' мода');
+
+  var st=el('state');
+  if(S.tir){st.className='state ok';setText('stateText','ТІШ: сигнал өтеді ('+S.th.toFixed(1)+'° > '+fx(S.crit,2)+'°)');}
+  else{st.className='state no';
+    setText('stateText',S.guide?'Жарық шығып кетеді: '+S.th.toFixed(1)+'° ≤ θкр = '+fx(S.crit,2)+'°':'Толқынжол жоқ: n₁ ≤ n₂');}
+
+  setText('oStep',smallLen(S.step));
+  setText('oRefl',S.tir?loc(S.nRefl):'—');
+  setText('oPath',S.tir?smallLen(S.path):'—');
+  setText('oExtra',S.tir?'+'+fx((S.pathF-1)*100,2)+' %':'—');
+  setText('oTime',S.time*1e9<1000?fx(S.time*1e9,2)+' нс':fx(S.time*1e6,3)+' мкс');
+  setText('oLoss',fx(S.loss,3)+' дБ');
+  setText('oPout',S.tir?fx(S.pout,3)+' дБм':'сигнал жоқ');
+  el('oPout').style.color=(!S.tir||S.pout<-28)?css('--warn'):'';
+  setText('oModal',S.modal*1e12<1000?fx(S.modal*1e12,2)+' пс':fx(S.modal*1e9,2)+' нс');
+  setText('oBW',S.bw>1e9?fx(S.bw/1e9,2)+' ГГц':fx(S.bw/1e6,1)+' МГц');
+  setText('oRate',S.bw>1e9?fx(S.bw*2/1e9,1)+' Гбит/с':fx(S.bw*2/1e6,0)+' Мбит/с');
+
+  var note;
+  if(!S.tir) note='Қазіргі параметрлерде сәуле өзекте ұсталмайды: әр шағылуда энергияның шамамен '+fx((1-S.R)*100,0)+' %-ы қабыққа өтіп кетеді, сондықтан сигнал желі ұзындығына қарамастан қабылдағышқа жетпейді.';
+  else if(S.modes===1) note='Талшық бірмодалы режимде жұмыс істейді (V = '+fx(S.V,2)+' < 2.405): модааралық дисперсия жоқ, өткізу жолағын тек таңдалған толқын ұзындығындағы хроматикалық дисперсия шектейді.';
+  else note='Көпмодалы режим, шамамен '+loc(S.modes)+' мода. '+lenStr(S.L)+
+    ' ұзындықта модааралық кеңею өткізу жолағын '+(S.bw>1e9?fx(S.bw/1e9,2)+' ГГц':fx(S.bw/1e6,0)+' МГц')+
+    ' деңгейіне дейін шектейді. Оны кеңейту үшін n₁ − n₂ айырмасын немесе өзек радиусын азайту керек.';
+  setText('engNote',note);
+
+  if(!S.tir){
+    setText('scaleLeft','сәуле қабық арқылы шығып кетеді');
+    setText('scaleRight','R = '+fx(S.R*100,1)+' %');
+  }else{
+    var shownReal=view3.dz>0?Math.min(S.L,SCENE_L/view3.dz*S.step):S.L;
+    setText('scaleLeft',shownReal>=S.L*0.999?'көрсетілген: толық ұзындық '+lenStr(S.L)
+      :'көрсетілген учаске ≈ '+smallLen(shownReal)+' / '+lenStr(S.L));
+    setText('scaleRight','барлығы '+loc(S.nRefl)+' шағылу');
+  }
+}
+
+/* ---------- flat canvases ---------- */
+function prep(c,h){var d=window.devicePixelRatio||1;
+  var w=c.clientWidth;
+  if(c.width!==Math.round(w*d)||c.height!==Math.round(h*d)){c.width=Math.round(w*d);c.height=Math.round(h*d);}
+  var x=c.getContext('2d');x.setTransform(d,0,0,d,0,0);x.clearRect(0,0,w,h);return x;}
+function dots(x,ax,ay,bx,by,t,n,r,col,alpha){
+  x.fillStyle=col;
+  for(var i=0;i<n;i++){var u=((t+i/n)%1);
+    x.globalAlpha=alpha*Math.sin(u*Math.PI);
+    x.beginPath();x.arc(ax+(bx-ax)*u,ay+(by-ay)*u,r,0,6.3);x.fill();}
+  x.globalAlpha=1;
+}
+function drawBoundary(t){
+  var c=el('cBnd');if(!c.clientWidth)return;
+  var H=250,x=prep(c,H),W=c.clientWidth;
+  var Px=W*.5,Py=H*.55,Lr=Math.min(Py-18,W*.4);
+  var beam=css('--beam'),warn=css('--warn'),ink2=css('--ink2'),core=css('--core'),ink=css('--ink');
+  x.fillStyle=core;x.globalAlpha=.10+clamp((S.n1-1.4)/0.2,0,1)*.16;x.fillRect(0,0,W,Py);
+  x.globalAlpha=.04+clamp((S.n2-1.3)/0.3,0,1)*.12;x.fillRect(0,Py,W,H-Py);x.globalAlpha=1;
+  x.strokeStyle=core;x.lineWidth=1.5;x.beginPath();x.moveTo(0,Py);x.lineTo(W,Py);x.stroke();
+  x.font='12px "IBM Plex Sans",sans-serif';x.fillStyle=ink2;x.textAlign='left';
+  x.fillText('өзек, n₁ = '+S.n1.toFixed(3),10,18);
+  x.fillText('қабық, n₂ = '+S.n2.toFixed(3),10,H-10);
+  // normal
+  x.setLineDash([3,4]);x.strokeStyle=ink2;x.lineWidth=1;
+  x.beginPath();x.moveTo(Px,Py-Lr-6);x.lineTo(Px,Py+Lr*.62);x.stroke();
+  // critical-angle guide
+  var tc=rad(S.crit);
+  if(S.guide){
+    x.strokeStyle=warn;x.globalAlpha=.7;
+    x.beginPath();x.moveTo(Px-Lr*Math.sin(tc),Py-Lr*Math.cos(tc));x.lineTo(Px,Py);x.stroke();
+    x.globalAlpha=1;
+  }
+  x.setLineDash([]);
+  var th=rad(S.th);
+  var ax=Px-Lr*Math.sin(th),ay=Py-Lr*Math.cos(th);
+  var bx=Px+Lr*Math.sin(th),by=ay;
+  // incident
+  x.strokeStyle=beam;x.lineWidth=3;x.lineCap='round';
+  x.beginPath();x.moveTo(ax,ay);x.lineTo(Px,Py);x.stroke();
+  // reflected
+  x.globalAlpha=clamp(S.R,.12,1);x.lineWidth=1+2*S.R;
+  x.beginPath();x.moveTo(Px,Py);x.lineTo(bx,by);x.stroke();x.globalAlpha=1;
+  // refracted
+  var tt=rad(S.thT),Lt=Lr*.62/Math.max(.25,Math.cos(tt));
+  Lt=Math.min(Lt,W*.45);
+  var cx2=Px+Lt*Math.sin(tt),cy2=Py+Lt*Math.cos(tt);
+  if(!S.tir){
+    x.strokeStyle=warn;x.globalAlpha=clamp((1-S.R)*1.3,.15,1);x.lineWidth=1+2.4*(1-S.R);
+    x.beginPath();x.moveTo(Px,Py);x.lineTo(cx2,cy2);x.stroke();x.globalAlpha=1;
+  }
+  // moving light dots
+  dots(x,ax,ay,Px,Py,t,4,3,beam,1);
+  dots(x,Px,Py,bx,by,t,4,3*Math.max(.4,S.R),beam,clamp(S.R,.15,1));
+  if(!S.tir)dots(x,Px,Py,cx2,cy2,t,4,3,warn,clamp(1-S.R,.2,1));
+  // angle arc θ
+  x.strokeStyle=ink;x.lineWidth=1.2;
+  x.beginPath();x.arc(Px,Py,38,-Math.PI/2-th,-Math.PI/2);x.stroke();
+  var mid=-Math.PI/2-th/2;
+  x.fillStyle=ink;x.font='13px "IBM Plex Mono",monospace';x.textAlign='center';
+  x.fillText('θ = '+S.th.toFixed(1)+'°',Px+60*Math.cos(mid)-18,Py+60*Math.sin(mid)-4);
+  if(S.guide){
+    x.fillStyle=warn;x.font='11.5px "IBM Plex Mono",monospace';x.textAlign='right';
+    var lxc=Px-Lr*Math.sin(tc),lyc=Py-Lr*Math.cos(tc);
+    x.fillText('θкр = '+fx(S.crit,1)+'°',Math.max(80,lxc-4),Math.max(32,lyc-4));
+  }
+  if(!S.tir){
+    x.fillStyle=warn;x.textAlign='left';x.font='11.5px "IBM Plex Mono",monospace';
+    x.fillText('сыну: '+fx(S.thT,1)+'°',Math.min(cx2+6,W-110),Math.min(cy2,H-26));
+  }
+  // R gauge
+  var gx=W-200,gy=12,gw=186;
+  x.textAlign='left';x.font='12px "IBM Plex Sans",sans-serif';x.fillStyle=ink2;
+  x.fillText('шағылу R = '+fx(S.R*100,1)+' %',gx,gy+10);
+  x.fillStyle=css('--line');x.fillRect(gx,gy+16,gw,6);
+  x.fillStyle=S.tir?beam:warn;x.fillRect(gx,gy+16,gw*S.R,6);
+  x.fillStyle=S.tir?beam:warn;x.font='12px "IBM Plex Sans",sans-serif';
+  x.fillText(S.tir?'толық ішкі шағылу':'жарықтың бір бөлігі сынады',gx,gy+38);
+}
+function drawNA(){
+  var c=el('cNA');if(!c.clientWidth)return;
+  var H=210,x=prep(c,H),W=c.clientWidth;
+  var cx=W*.44,cy=H/2,coreH=30+clamp((D.la-0.6)/1.4,0,1)*28,cladH=86,fl=W*.54;
+  var beam=css('--beam'),warn=css('--warn');
+  x.globalAlpha=.14;x.fillStyle=css('--core');x.fillRect(cx,cy-cladH/2,fl,cladH);
+  x.globalAlpha=.26;x.fillRect(cx,cy-coreH/2,fl,coreH);x.globalAlpha=1;
+  x.strokeStyle=css('--line');x.lineWidth=1;x.strokeRect(cx,cy-cladH/2,fl,cladH);
+  var R=Math.min(cx-12,96),acc=rad(S.thMax);
+  x.fillStyle=beam;x.globalAlpha=.18;
+  x.beginPath();x.moveTo(cx,cy);x.arc(cx,cy,R,Math.PI-acc,Math.PI+acc);x.closePath();x.fill();x.globalAlpha=1;
+  x.strokeStyle=beam;x.globalAlpha=.5;x.lineWidth=1;
+  x.beginPath();x.moveTo(cx-R*Math.cos(acc),cy-R*Math.sin(acc));x.lineTo(cx,cy);
+  x.lineTo(cx-R*Math.cos(acc),cy+R*Math.sin(acc));x.stroke();x.globalAlpha=1;
+  // actual ray for current θ
+  var col=S.tir?beam:warn;
+  x.strokeStyle=col;x.lineWidth=2;x.lineCap='round';x.lineJoin='round';
+  if(isNaN(S.thIn)){
+    x.fillStyle=warn;x.font='11.5px "IBM Plex Sans",sans-serif';x.textAlign='left';
+    x.fillText('θ = '+S.th.toFixed(1)+'°: ауадан',10,H-26);
+    x.fillText('енгізу мүмкін емес',10,H-10);
+  }else{
+    var tin=rad(S.thIn);
+    x.beginPath();x.moveTo(cx-R*Math.cos(tin),cy-R*Math.sin(tin));x.lineTo(cx,cy);
+    var slope=Math.tan(rad(90-S.th))*3;                  // ×3 visual exaggeration
+    var half=coreH/2,px=cx,py=cy,dir=1,g=0;
+    var first=true;
+    while(px<cx+fl&&g++<80){
+      var dy=first?half:coreH;var dx=dy/Math.max(slope,1e-3);
+      var nx=px+dx,ny=py+dir*dy;
+      if(nx>cx+fl){x.lineTo(cx+fl,py+dir*dy*((cx+fl-px)/dx));break;}
+      x.lineTo(nx,ny);
+      if(!S.tir){
+        var ex=nx+(cladH/2-half)/Math.max(slope,1e-3)*1.6,ey=cy+dir*(cladH/2+16);
+        x.stroke();x.beginPath();x.moveTo(nx,ny);x.lineTo(Math.min(ex,cx+fl+20),ey);break;
+      }
+      px=nx;py=ny;dir=-dir;first=false;
+    }
+    x.stroke();
+    x.fillStyle=css('--ink2');x.font='11.5px "IBM Plex Sans",sans-serif';x.textAlign='left';
+    x.fillStyle=col;x.fillText('кіріс бұрышы = '+fx(S.thIn,1)+'°',10,H-10);
+  }
+  x.fillStyle=css('--ink2');x.font='11.5px "IBM Plex Sans",sans-serif';x.textAlign='left';
+  x.fillText('θmax = '+fx(S.thMax,1)+'°',10,18);
+  x.fillText('конустан тыс — шығын',10,36);
+}
+function drawPow(){
+  var c=el('cPow');if(!c.clientWidth)return;
+  var H=210,x=prep(c,H),W=c.clientWidth,m={l:42,r:12,t:14,b:30};
+  var Lkm=Math.max(S.L/1000,0.001);
+  var xmax=Math.max(1,Math.min(200,Lkm*2));
+  var ymin=-40,ymax=2;
+  function X(v){return m.l+v/xmax*(W-m.l-m.r);}
+  function Y(v){return m.t+(1-(v-ymin)/(ymax-ymin))*(H-m.t-m.b);}
+  x.strokeStyle=css('--line');x.lineWidth=1;x.fillStyle=css('--ink2');
+  x.font='10.5px "IBM Plex Mono",monospace';x.textAlign='right';
+  for(var v=ymin;v<=ymax;v+=10){x.beginPath();x.moveTo(m.l,Y(v));x.lineTo(W-m.r,Y(v));x.stroke();
+    x.fillText(v+'',m.l-5,Y(v)+3);}
+  x.textAlign='center';
+  for(var k=0;k<=4;k++){var xv=xmax*k/4;x.fillText(fx(xv,xmax>=10?0:2),X(xv),H-12);}
+  x.font='11px "IBM Plex Sans",sans-serif';x.fillText('ұзындық, км',W/2,H-1);
+  x.strokeStyle=css('--warn');x.setLineDash([4,4]);
+  x.beginPath();x.moveTo(m.l,Y(-28));x.lineTo(W-m.r,Y(-28));x.stroke();x.setLineDash([]);
+  x.strokeStyle=css('--core');x.lineWidth=2;x.beginPath();
+  for(var q=0;q<=100;q++){var d=xmax*q/100;x.lineTo(X(d),Y(Math.max(ymin,-S.alpha*d)));}
+  x.stroke();
+  var pr=-S.alpha*Lkm;
+  x.fillStyle=pr>=-28?css('--beam'):css('--warn');
+  x.beginPath();x.arc(X(Math.min(Lkm,xmax)),Y(Math.max(ymin,pr)),4.5,0,6.3);x.fill();
+  x.font='11px "IBM Plex Sans",sans-serif';x.textAlign='left';
+  x.fillText(fx(pr,2)+' дБм',Math.min(X(Math.min(Lkm,xmax))+8,W-72),Y(Math.max(ymin,pr))-7);
+  x.fillStyle=css('--ink2');
+  x.textAlign='right';x.fillText('өшу бойынша шек: '+fx(28/S.alpha,0)+' км',W-m.r-4,Y(-28)-6);
+}
+
+/* ---------- main loop: values glide toward the targets ---------- */
+var dirty=true,last=performance.now(),phase=0;
+function frame(now){
+  var dt=Math.min(.1,(now-last)/1000);last=now;
+  var k=REDUCE?1:1-Math.exp(-dt/0.3);
+  var moving=false;
+  for(var i=0;i<KEYS.length;i++){
+    var key=KEYS[i],d=T[key]-D[key];
+    if(Math.abs(d)>EPS[key]){D[key]+=d*k;moving=true;}else D[key]=T[key];
+  }
+  phase=(phase+dt*0.55)%1;
+  if(moving||dirty){
+    S=compute(D);
+    build3D();readouts();drawNA();drawPow();
+    dirty=false;
+  }
+  drawBoundary(phase);
+  if(ok3d){
+    var kc=REDUCE?1:1-Math.exp(-dt/0.12);
+    if(spin&&!drag)tRotY+=.21*dt;
+    rotY+=(tRotY-rotY)*kc;rotX+=(tRotX-rotX)*kc;zoom+=(tZoom-zoom)*kc;
+    group.rotation.y=rotY;group.rotation.x=rotX;
+    camera.position.set(0,110/zoom,370/zoom);camera.lookAt(0,0,0);
+    var tt=now/3600;
+    for(var j=0;j<photons.length;j++){
+      var u=(tt+j/photons.length)%1;
+      photons[j].position.copy(posAt(u));
+      photons[j].material.opacity=S.tir?1:clamp(1-u*1.1,0,1);
+    }
+    renderer.render(scene,camera);
+  }
+  requestAnimationFrame(frame);
+}
+
+/* ---------- controls ---------- */
+function onInput(){T=readTarget();labels();}
+['n1','n2','th','ra','len'].forEach(function(id){el(id).addEventListener('input',onInput);});
+el('lam').addEventListener('change',onInput);
+[].slice.call(document.querySelectorAll('[data-len]')).forEach(function(b){
+  b.addEventListener('click',function(){el('len').value=b.dataset.len;onInput();});
+});
+function setAll(n1,n2,th,a,L){
+  el('n1').value=n1;el('n2').value=n2;el('th').value=th;
+  if(a)el('ra').value=a; if(L!==undefined)el('len').value=L;
+  onInput();
+}
+el('demoOk').addEventListener('click',function(){setAll(1.480,1.440,82,25,0);});
+el('demoBad').addEventListener('click',function(){setAll(1.480,1.470,82,25,0);});
+el('reset').addEventListener('click',function(){
+  el('lam').value='1550';setAll(1.480,1.440,82,25,0);
+  tZoom=1;tRotY=.55;tRotX=.3;
+});
+
+/* ---------- self-check ---------- */
+var KEY={1:{v:80.57,tol:.15,txt:'θкр = arcsin(1.46/1.48) = arcsin 0.98649 = 80.57°. Бұдан кіші бұрышпен түскен сәуле қабыққа өтіп кетеді.'},
+         2:{v:0.2425,tol:.003,txt:'NA = √(1.48² − 1.46²) = √(2.1904 − 2.1316) = √0.0588 = 0.2425, яғни жарық ±14.0° конус ішінде ұсталады.'}};
+[].slice.call(document.querySelectorAll('[data-q]')).forEach(function(b){
+  b.addEventListener('click',function(){
+    var i=b.dataset.q,k=KEY[i],f=el('f'+i),v=parseFloat(String(el('q'+i).value).replace(',','.'));
+    if(isNaN(v)){f.className='fb no';f.textContent='Сандық мән енгізіңіз.';return;}
+    if(Math.abs(v-k.v)<=k.tol){f.className='fb ok';f.textContent='Дұрыс. '+k.txt;}
+    else{f.className='fb no';f.textContent='Әзірге сәйкес келмейді. '+(v>k.v?'Мән тым үлкен':'Мән тым кіші')+' — калькулятордың градуспен есептеп тұрғанын және n₁ мен n₂ ауыстырылып кетпегенін тексеріңіз.';}
+  });
+});
+
+window.addEventListener('resize',function(){resize3D();dirty=true;});
+labels();resize3D();
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
